@@ -274,8 +274,9 @@ app.post("/simulate", async (c) => {
 app.get("/contracts", (c) => {
   return c.json({
     vault: {
-      address: "Not yet deployed",
+      address: "SP2QXPFF4M72QYZWXE7S5321XJDJ2DD32DGEMN5QA.sbtc-yield-vault",
       network: "mainnet",
+      explorer: "https://explorer.hiro.so/txid/SP2QXPFF4M72QYZWXE7S5321XJDJ2DD32DGEMN5QA.sbtc-yield-vault?chain=mainnet",
     },
     integrations: {
       zest: ZEST_CONTRACTS,
