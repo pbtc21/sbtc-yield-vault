@@ -7,7 +7,10 @@ import {
   getUserPosition,
   buildDepositTransaction,
   buildWithdrawTransaction,
+  buildDeployToStrategyTransaction,
+  buildReportYieldTransaction,
   satsToBtc,
+  VAULT_CONTRACT,
 } from "./vault";
 import { getZestPoolData, ZEST_CONTRACTS } from "./zest";
 import { simulateLoop, calculateLoopYield, DEFAULT_LOOP_CONFIG } from "./looping";
@@ -274,20 +277,141 @@ app.post("/simulate", async (c) => {
 app.get("/contracts", (c) => {
   return c.json({
     vault: {
-      address: "SP2QXPFF4M72QYZWXE7S5321XJDJ2DD32DGEMN5QA.sbtc-yield-vault",
+      address: VAULT_CONTRACT,
       network: "mainnet",
-      explorer: "https://explorer.hiro.so/txid/SP2QXPFF4M72QYZWXE7S5321XJDJ2DD32DGEMN5QA.sbtc-yield-vault?chain=mainnet",
+      explorer: `https://explorer.hiro.so/txid/${VAULT_CONTRACT}?chain=mainnet`,
     },
     integrations: {
       zest: ZEST_CONTRACTS,
       sbtc: "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token",
+      usdh: "SPN5AKG35QZSK2M8GAMR4AFX45659RJHDW353HSG.usdh-token-v1",
     },
     strategy: {
-      type: "Leveraged sBTC Yield",
+      type: "Leveraged sBTC Yield via Operator",
       loops: 3,
       targetLtv: "70%",
       estimatedApy: "~11%",
+      description: "Operator executes looping strategy on Zest Protocol and reports yields",
     },
+  });
+});
+
+// ============================================
+// OPERATOR ENDPOINTS
+// ============================================
+
+// Deploy funds to strategy
+app.post("/operator/deploy", async (c) => {
+  const adminKey = c.req.header("X-Admin-Key");
+  if (!adminKey) {
+    return c.json({ error: "Admin key required" }, 401);
+  }
+
+  const body = await c.req.json<{ amount: string }>();
+  if (!body.amount) {
+    return c.json({ error: "amount is required" }, 400);
+  }
+
+  const tx = buildDeployToStrategyTransaction(body.amount);
+
+  return c.json({
+    message: "Deploy to strategy transaction",
+    transaction: tx,
+    amount: body.amount,
+    amountBtc: satsToBtc(body.amount),
+    instructions: "Sign and broadcast with your operator wallet",
+  });
+});
+
+// Report yield from strategy
+app.post("/operator/report-yield", async (c) => {
+  const adminKey = c.req.header("X-Admin-Key");
+  if (!adminKey) {
+    return c.json({ error: "Admin key required" }, 401);
+  }
+
+  const body = await c.req.json<{ grossYield: string }>();
+  if (!body.grossYield) {
+    return c.json({ error: "grossYield is required" }, 400);
+  }
+
+  const grossYield = BigInt(body.grossYield);
+  const operatorFee = grossYield * 10n / 100n; // 10%
+  const netYield = grossYield - operatorFee;
+
+  const tx = buildReportYieldTransaction(body.grossYield);
+
+  return c.json({
+    message: "Report yield transaction",
+    transaction: tx,
+    yield: {
+      gross: body.grossYield,
+      grossBtc: satsToBtc(body.grossYield),
+      operatorFee: operatorFee.toString(),
+      operatorFeeBtc: satsToBtc(operatorFee.toString()),
+      net: netYield.toString(),
+      netBtc: satsToBtc(netYield.toString()),
+    },
+    instructions: "Sign and broadcast with your operator wallet",
+  });
+});
+
+// Execute looping strategy instructions
+app.get("/operator/loop-instructions", async (c) => {
+  const btcPrice = await getBtcPrice();
+
+  return c.json({
+    title: "Looping Strategy Execution Guide",
+    overview: "Manual looping strategy using Zest Protocol",
+    steps: [
+      {
+        step: 1,
+        action: "Deploy sBTC to Strategy",
+        description: "Call deploy-to-strategy to mark funds as deployed",
+        endpoint: "POST /operator/deploy",
+      },
+      {
+        step: 2,
+        action: "Supply sBTC to Zest",
+        description: "Call Zest borrow-helper supply function",
+        contract: "SP2VCQJGH7PHP2DJK7Z0V48AGBHQAW3R3ZW1QF4N.borrow-helper-v2-1-5",
+        function: "supply",
+      },
+      {
+        step: 3,
+        action: "Borrow USDh",
+        description: "Borrow USDh at 70% LTV against sBTC collateral",
+        contract: "SP2VCQJGH7PHP2DJK7Z0V48AGBHQAW3R3ZW1QF4N.borrow-helper-v2-1-5",
+        function: "borrow",
+        params: {
+          asset: "SPN5AKG35QZSK2M8GAMR4AFX45659RJHDW353HSG.usdh-token-v1",
+          targetLtv: "70%",
+        },
+      },
+      {
+        step: 4,
+        action: "Swap USDh to sBTC",
+        description: "Use Bitflow or other DEX to swap USDh back to sBTC",
+        dex: "Bitflow",
+      },
+      {
+        step: 5,
+        action: "Repeat Loop",
+        description: "Repeat steps 2-4 two more times for 3x leverage",
+      },
+      {
+        step: 6,
+        action: "Report Yield",
+        description: "Call report-yield with gross yield earned",
+        endpoint: "POST /operator/report-yield",
+      },
+    ],
+    currentBtcPrice: btcPrice,
+    riskWarnings: [
+      "Monitor LTV ratio - liquidation at ~80%",
+      "Keep buffer for price volatility",
+      "Ensure sufficient USDh liquidity for swaps",
+    ],
   });
 });
 

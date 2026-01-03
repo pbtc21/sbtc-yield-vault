@@ -10,6 +10,9 @@ export interface VaultStats {
   managementFeeBps: number;
   loopIterations: number;
   estimatedApy: string;
+  liquidBalance?: string;
+  deployedBalance?: string;
+  usdhDebt?: string;
 }
 
 export interface UserPosition {
