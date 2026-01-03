@@ -6,15 +6,12 @@
 import {
   makeContractCall,
   broadcastTransaction,
-  AnchorMode,
   PostConditionMode,
   uintCV,
   principalCV,
-  someCV,
   noneCV,
   listCV,
   tupleCV,
-  bufferCV,
 } from "@stacks/transactions";
 import { STACKS_MAINNET } from "@stacks/network";
 
@@ -67,7 +64,6 @@ export function buildSupplyTx(params: {
     ],
     senderKey,
     network: STACKS_MAINNET,
-    anchorMode: AnchorMode.Any,
     postConditionMode: PostConditionMode.Allow,
     fee: 10000n, // 0.01 STX fee
   });
@@ -108,7 +104,6 @@ export function buildBorrowTx(params: {
     ],
     senderKey,
     network: STACKS_MAINNET,
-    anchorMode: AnchorMode.Any,
     postConditionMode: PostConditionMode.Allow,
     fee: 15000n,
   });
@@ -135,7 +130,6 @@ export function buildRepayTx(params: {
     ],
     senderKey,
     network: STACKS_MAINNET,
-    anchorMode: AnchorMode.Any,
     postConditionMode: PostConditionMode.Allow,
     fee: 10000n,
   });
@@ -174,7 +168,6 @@ export function buildWithdrawTx(params: {
     ],
     senderKey,
     network: STACKS_MAINNET,
-    anchorMode: AnchorMode.Any,
     postConditionMode: PostConditionMode.Allow,
     fee: 15000n,
   });
@@ -208,10 +201,7 @@ export async function getZestPoolData(): Promise<{
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sender: "SP2VCQJGH7PHP2DJK7Z0V48AGBHQAW3R3ZW1QF4N",
-          arguments: [
-            // sBTC asset principal as hex
-            "0616" + Buffer.from("SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token").toString("hex"),
-          ],
+          arguments: [],
         }),
       }
     );

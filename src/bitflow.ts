@@ -5,7 +5,6 @@
 
 import {
   makeContractCall,
-  AnchorMode,
   PostConditionMode,
   uintCV,
   principalCV,
@@ -81,7 +80,6 @@ export function buildSwapTx(params: {
     ],
     senderKey,
     network: STACKS_MAINNET,
-    anchorMode: AnchorMode.Any,
     postConditionMode: PostConditionMode.Allow,
     fee: 10000n,
   });
