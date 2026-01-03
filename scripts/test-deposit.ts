@@ -1,80 +1,98 @@
 /**
- * Test deposit to the vault
+ * Test the deposit flow with x402 payment
  */
 
 import { readFileSync } from "fs";
-import {
-  makeContractCall,
-  AnchorMode,
-  PostConditionMode,
-  uintCV,
-  serializeTransaction,
-} from "@stacks/transactions";
-import { STACKS_MAINNET } from "@stacks/network";
+import { X402PaymentClient } from "x402-stacks";
+import type { X402PaymentRequired } from "x402-stacks";
 
-const wallet = JSON.parse(readFileSync("/home/publius/.stacks-wallet.json", "utf-8"));
+// Load wallet
+const walletData = JSON.parse(readFileSync("/home/publius/.stacks-wallet.json", "utf-8"));
 
-// Vault contract
-const VAULT_CONTRACT = "SP2QXPFF4M72QYZWXE7S5321XJDJ2DD32DGEMN5QA";
-const VAULT_NAME = "sbtc-yield-vault";
+const VAULT_URL = "https://sbtc-yield-vault.p-d07.workers.dev";
 
-// Amount to deposit (1000 sats = 0.00001 BTC)
-const DEPOSIT_AMOUNT = 1000n;
+// Create x402 payment client
+const paymentClient = new X402PaymentClient({
+  network: "mainnet",
+  privateKey: walletData.privateKey,
+});
 
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-  }
-  return bytes;
-}
+async function testDeposit() {
+  console.log("=== Testing sBTC Vault Deposit Flow ===\n");
+  console.log("Wallet:", walletData.mainnetAddress, "\n");
 
-async function main() {
-  console.log("Testing vault deposit...\n");
-  console.log("Wallet:", wallet.mainnetAddress);
-  console.log("Deposit amount:", DEPOSIT_AMOUNT.toString(), "sats");
-  console.log("Vault:", `${VAULT_CONTRACT}.${VAULT_NAME}\n`);
+  const depositAmount = "10000"; // 10,000 sats = 0.0001 BTC
 
-  // Build deposit transaction
-  const tx = await makeContractCall({
-    contractAddress: VAULT_CONTRACT,
-    contractName: VAULT_NAME,
-    functionName: "deposit",
-    functionArgs: [uintCV(DEPOSIT_AMOUNT)],
-    senderKey: wallet.privateKey,
-    network: STACKS_MAINNET,
-    anchorMode: AnchorMode.Any,
-    postConditionMode: PostConditionMode.Allow,
-    fee: 10000n, // 0.01 STX
-    nonce: 2n, // After trait + vault deployment
-  });
-
-  const serializedHex = serializeTransaction(tx);
-  const serializedBytes = hexToBytes(serializedHex);
-
-  console.log("TX size:", serializedBytes.length, "bytes");
-  console.log("Broadcasting...\n");
-
-  const response = await fetch("https://api.mainnet.hiro.so/v2/transactions", {
+  // Step 1: Make deposit request without payment
+  console.log("Step 1: Request deposit without payment...");
+  const initialResponse = await fetch(VAULT_URL + "/deposit", {
     method: "POST",
-    headers: { "Content-Type": "application/octet-stream" },
-    body: serializedBytes,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amount: depositAmount,
+      sender: walletData.mainnetAddress,
+    }),
   });
 
-  const text = await response.text();
+  console.log("  Status:", initialResponse.status);
 
-  if (response.ok) {
-    const txId = text.replace(/"/g, "");
-    console.log("✅ Deposit transaction submitted!");
-    console.log("TX ID:", txId);
-    console.log(`\nExplorer: https://explorer.hiro.so/txid/${txId}?chain=mainnet`);
-    console.log("\nWait ~10-30 seconds for confirmation, then check:");
-    console.log("curl https://sbtc-yield-vault.p-d07.workers.dev/stats");
+  if (initialResponse.status !== 402) {
+    const text = await initialResponse.text();
+    console.log("  Unexpected response:", text);
+    return;
+  }
+
+  const paymentReq: X402PaymentRequired = await initialResponse.json();
+  console.log("  Got 402 Payment Required");
+  console.log("  Amount:", paymentReq.maxAmountRequired, "sats");
+  console.log("  Pay to:", paymentReq.payTo);
+  console.log("  Token:", paymentReq.tokenType);
+  console.log("  Expires:", paymentReq.expiresAt);
+  console.log("  Nonce:", paymentReq.nonce);
+
+  // Step 2: Sign the payment
+  console.log("\nStep 2: Signing sBTC payment...");
+  const signResult = await paymentClient.signPayment(paymentReq);
+
+  if (!signResult.success) {
+    console.log("  Signing failed:", signResult.error);
+    return;
+  }
+
+  console.log("  Payment signed");
+  console.log("  Sender:", signResult.senderAddress);
+  console.log("  Signed tx:", signResult.signedTransaction.substring(0, 60) + "...");
+
+  // Step 3: Submit deposit with payment
+  console.log("\nStep 3: Submitting deposit with payment...");
+  const depositResponse = await fetch(VAULT_URL + "/deposit", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-PAYMENT": signResult.signedTransaction,
+    },
+    body: JSON.stringify({
+      amount: depositAmount,
+      sender: walletData.mainnetAddress,
+    }),
+  });
+
+  console.log("  Status:", depositResponse.status);
+
+  const result = await depositResponse.json();
+  console.log("  Response:", JSON.stringify(result, null, 2));
+
+  // Check for X-PAYMENT-RESPONSE header
+  const paymentResponse = depositResponse.headers.get("X-PAYMENT-RESPONSE");
+  if (paymentResponse) {
+    console.log("\n  Payment confirmation:", paymentResponse);
+  }
+
+  if (depositResponse.status === 200 || depositResponse.status === 201) {
+    console.log("\nDeposit flow completed successfully!");
   } else {
-    console.log("❌ Failed");
-    console.log("Status:", response.status);
-    console.log("Response:", text);
+    console.log("\nDeposit failed with status", depositResponse.status);
   }
 }
 
-main().catch(console.error);
+testDeposit().catch(console.error);
