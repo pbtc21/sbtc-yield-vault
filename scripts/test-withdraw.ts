@@ -1,75 +1,66 @@
 /**
- * Test withdraw from the vault
+ * Test the withdraw flow via API
  */
 
 import { readFileSync } from "fs";
-import {
-  makeContractCall,
-  AnchorMode,
-  PostConditionMode,
-  uintCV,
-  serializeTransaction,
-} from "@stacks/transactions";
-import { STACKS_MAINNET } from "@stacks/network";
 
-const wallet = JSON.parse(readFileSync("/home/publius/.stacks-wallet.json", "utf-8"));
+// Load wallet
+const walletData = JSON.parse(readFileSync("/home/publius/.stacks-wallet.json", "utf-8"));
 
-const VAULT_CONTRACT = "SP2QXPFF4M72QYZWXE7S5321XJDJ2DD32DGEMN5QA";
-const VAULT_NAME = "sbtc-yield-vault";
+const VAULT_URL = "https://sbtc-yield-vault.p-d07.workers.dev";
 
-// Withdraw 500 shares (half position)
-const WITHDRAW_SHARES = 500n;
+async function testWithdraw() {
+  console.log("=== Testing sBTC Vault Withdraw Flow ===\n");
+  console.log("Wallet:", walletData.mainnetAddress, "\n");
 
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-  }
-  return bytes;
-}
+  // Step 1: Check user position first
+  console.log("Step 1: Checking current position...");
+  const positionResponse = await fetch(
+    `${VAULT_URL}/position/${walletData.mainnetAddress}`
+  );
+  const position = await positionResponse.json();
+  console.log("  Position:", JSON.stringify(position, null, 2));
 
-async function main() {
-  console.log("Testing vault withdraw...\n");
-  console.log("Wallet:", wallet.mainnetAddress);
-  console.log("Withdraw shares:", WITHDRAW_SHARES.toString());
-  console.log("Vault:", `${VAULT_CONTRACT}.${VAULT_NAME}\n`);
+  // Step 2: Check vault stats
+  console.log("\nStep 2: Checking vault stats...");
+  const statsResponse = await fetch(`${VAULT_URL}/stats`);
+  const stats = await statsResponse.json();
+  console.log("  Total assets:", stats.totalAssetsBtc, "BTC");
+  console.log("  Total shares:", stats.totalShares);
+  console.log("  Share price:", stats.sharePrice);
 
-  const tx = await makeContractCall({
-    contractAddress: VAULT_CONTRACT,
-    contractName: VAULT_NAME,
-    functionName: "withdraw",
-    functionArgs: [uintCV(WITHDRAW_SHARES)],
-    senderKey: wallet.privateKey,
-    network: STACKS_MAINNET,
-    anchorMode: AnchorMode.Any,
-    postConditionMode: PostConditionMode.Allow,
-    fee: 10000n,
-    nonce: 3n,
-  });
+  // Step 3: Request withdraw transaction
+  console.log("\nStep 3: Requesting withdraw transaction...");
 
-  const serializedHex = serializeTransaction(tx);
-  const serializedBytes = hexToBytes(serializedHex);
+  // Use actual shares if available, otherwise test with mock amount
+  const sharesToWithdraw = position.shares !== "0" ? position.shares : "1000";
 
-  console.log("Broadcasting...\n");
-
-  const response = await fetch("https://api.mainnet.hiro.so/v2/transactions", {
+  const withdrawResponse = await fetch(VAULT_URL + "/withdraw", {
     method: "POST",
-    headers: { "Content-Type": "application/octet-stream" },
-    body: serializedBytes,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      shares: sharesToWithdraw,
+      sender: walletData.mainnetAddress,
+    }),
   });
 
-  const text = await response.text();
+  console.log("  Status:", withdrawResponse.status);
 
-  if (response.ok) {
-    const txId = text.replace(/"/g, "");
-    console.log("✅ Withdraw transaction submitted!");
-    console.log("TX ID:", txId);
-    console.log(`\nExplorer: https://explorer.hiro.so/txid/${txId}?chain=mainnet`);
+  const result = await withdrawResponse.json();
+  console.log("  Response:", JSON.stringify(result, null, 2));
+
+  if (withdrawResponse.status === 200) {
+    console.log("\n✅ Withdraw transaction generated!");
+    console.log("\nWithdraw details:");
+    console.log("  Shares:", result.withdraw?.shares);
+    console.log("  Expected assets:", result.withdraw?.expectedAssetsBtc, "BTC");
+    console.log("  Min receive:", result.withdraw?.minReceiveBtc, "BTC (1% slippage)");
+    console.log("\nTo complete withdrawal:");
+    console.log("  1. Sign the transaction with your Stacks wallet");
+    console.log("  2. Broadcast to the network");
   } else {
-    console.log("❌ Failed");
-    console.log("Status:", response.status);
-    console.log("Response:", text);
+    console.log("\n❌ Withdraw request failed");
   }
 }
 
-main().catch(console.error);
+testWithdraw().catch(console.error);
