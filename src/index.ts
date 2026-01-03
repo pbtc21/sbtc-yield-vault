@@ -9,6 +9,9 @@ import {
   buildWithdrawTransaction,
   satsToBtc,
 } from "./vault";
+import { getZestPoolData, ZEST_CONTRACTS } from "./zest";
+import { simulateLoop, calculateLoopYield, DEFAULT_LOOP_CONFIG } from "./looping";
+import { getExecutorStatus, getBtcPrice } from "./executor";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -185,6 +188,130 @@ app.post("/admin/harvest", async (c) => {
 // Health check
 app.get("/health", (c) => {
   return c.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// ============================================
+// ZEST INTEGRATION ENDPOINTS
+// ============================================
+
+// Get Zest Protocol pool data
+app.get("/zest/stats", async (c) => {
+  const poolData = await getZestPoolData();
+
+  return c.json({
+    protocol: "Zest Protocol",
+    contracts: ZEST_CONTRACTS,
+    pool: poolData,
+    description: "Real-time data from Zest Protocol lending markets",
+  });
+});
+
+// Simulate looping strategy
+app.post("/simulate", async (c) => {
+  const body = await c.req.json<{
+    amount: string;
+    btcPrice?: number;
+    loops?: number;
+  }>();
+
+  if (!body.amount) {
+    return c.json({ error: "amount is required (in sats)" }, 400);
+  }
+
+  const amount = BigInt(body.amount);
+  const btcPrice = body.btcPrice || 100000; // Default $100k BTC
+  const loops = body.loops || DEFAULT_LOOP_CONFIG.maxIterations;
+
+  // Simulate the loop
+  const simulation = simulateLoop({
+    initialDeposit: amount,
+    btcPriceUsd: btcPrice,
+    config: { maxIterations: loops },
+  });
+
+  // Calculate yield projections
+  const yieldCalc = calculateLoopYield({
+    initialDeposit: amount,
+    loops,
+    baseApy: 5.0,
+    ltvRatio: 0.7,
+  });
+
+  return c.json({
+    input: {
+      amount: body.amount,
+      amountBtc: satsToBtc(body.amount),
+      btcPrice,
+      loops,
+    },
+    simulation: {
+      iterations: simulation.iterations.map((iter, i) => ({
+        loop: i + 1,
+        deposit: iter.deposit.toString(),
+        depositBtc: satsToBtc(iter.deposit.toString()),
+        borrow: iter.borrow.toString(),
+        borrowUsd: (Number(iter.borrow) / 1_000_000).toFixed(2),
+        swapReceive: iter.swapReceive.toString(),
+        swapReceiveBtc: satsToBtc(iter.swapReceive.toString()),
+      })),
+      totalDeposited: simulation.totalDeposited.toString(),
+      totalDepositedBtc: satsToBtc(simulation.totalDeposited.toString()),
+      totalBorrowed: simulation.totalBorrowed.toString(),
+      totalBorrowedUsd: (Number(simulation.totalBorrowed) / 1_000_000).toFixed(2),
+      leverage: simulation.leverage.toFixed(2) + "x",
+    },
+    projectedYield: {
+      leverage: yieldCalc.leverage.toFixed(2) + "x",
+      grossApy: yieldCalc.grossApy.toFixed(2) + "%",
+      borrowCost: yieldCalc.borrowCost.toFixed(2) + "%",
+      netApy: yieldCalc.netApy.toFixed(2) + "%",
+      afterFee: (yieldCalc.netApy * 0.9).toFixed(2) + "% (10% mgmt fee)",
+    },
+  });
+});
+
+// Get contracts info
+app.get("/contracts", (c) => {
+  return c.json({
+    vault: {
+      address: "Not yet deployed",
+      network: "mainnet",
+    },
+    integrations: {
+      zest: ZEST_CONTRACTS,
+      sbtc: "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token",
+    },
+    strategy: {
+      type: "Leveraged sBTC Yield",
+      loops: 3,
+      targetLtv: "70%",
+      estimatedApy: "~11%",
+    },
+  });
+});
+
+// Get executor status (vault operator wallet)
+app.get("/executor/status", async (c) => {
+  const status = await getExecutorStatus();
+  const btcPrice = await getBtcPrice();
+
+  return c.json({
+    ...status,
+    btcPrice: {
+      usd: btcPrice,
+      source: "CoinGecko",
+    },
+  });
+});
+
+// Get current BTC price
+app.get("/price/btc", async (c) => {
+  const price = await getBtcPrice();
+  return c.json({
+    asset: "BTC",
+    priceUsd: price,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 export default app;
