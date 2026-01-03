@@ -1,0 +1,8 @@
+name = "sbtc-yield-vault"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[vars]
+VAULT_CONTRACT = "SPFE9JKCZ4XV35YND18FXCFT2Q32FHPVYKHNHYAF.sbtc-yield-vault"
+OPERATOR_ADDRESS = "SPFE9JKCZ4XV35YND18FXCFT2Q32FHPVYKHNHYAF"
+NETWORK = "mainnet"

@@ -1,0 +1,24 @@
+[project]
+name = "sbtc-yield-vault"
+description = "sBTC Yield Vault with Looping Strategy"
+authors = ["pbtc21 <p@aibtc.com>"]
+telemetry = false
+cache_dir = ".cache"
+
+[contracts.sip-010-trait]
+path = "contracts/traits/sip-010-trait.clar"
+clarity_version = 2
+epoch = 2.5
+
+[contracts.vault-trait]
+path = "contracts/traits/vault-trait.clar"
+clarity_version = 2
+epoch = 2.5
+
+[contracts.sbtc-yield-vault]
+path = "contracts/sbtc-yield-vault.clar"
+clarity_version = 2
+epoch = 2.5
+
+[repl.analysis]
+passes = ["check_checker"]
