@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import type { Env } from "./types";
-import { x402SbtcMiddleware, createPaymentResponse } from "./x402-sbtc";
+import type { Env, Variables } from "./types";
+import { x402SbtcMiddleware, createPaymentRequired } from "./x402-sbtc";
 import {
   getVaultStats,
   getUserPosition,
@@ -16,7 +16,7 @@ import { getZestPoolData, ZEST_CONTRACTS } from "./zest";
 import { simulateLoop, calculateLoopYield, DEFAULT_LOOP_CONFIG } from "./looping";
 import { getExecutorStatus, getBtcPrice } from "./executor";
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // Enable CORS
 app.use("*", cors());

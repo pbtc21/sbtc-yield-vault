@@ -49,3 +49,16 @@ export interface Env {
   OPERATOR_ADDRESS: string;
   NETWORK: string;
 }
+
+// Payment info stored in context after x402 verification
+export interface PaymentContext {
+  txId: string;
+  sender: string;
+  amount: string;
+  status: string;
+}
+
+// Hono context variables
+export interface Variables {
+  payment?: PaymentContext;
+}
