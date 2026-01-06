@@ -29,13 +29,13 @@ app.use("*", cors());
 app.get("/", (c) => {
   return c.json({
     service: "sBTC Yield Vault",
-    version: "1.0.0",
+    version: "2.0.0",
     description: "Leveraged yield vault using sBTC looping strategy on Zest Protocol",
     endpoints: {
       "GET /": "API info",
       "GET /stats": "Vault statistics",
       "GET /position/:address": "User position",
-      "POST /deposit": "Deposit sBTC (x402 gated)",
+      "POST /deposit": "Deposit sBTC (0.001 STX)",
       "POST /withdraw": "Withdraw sBTC + yield",
     },
     config: {
@@ -44,6 +44,8 @@ app.get("/", (c) => {
       managementFee: "10%",
       tvlCap: "1 BTC",
     },
+    x402: true,
+    pricing: "0.001 STX per request",
   });
 });
 
