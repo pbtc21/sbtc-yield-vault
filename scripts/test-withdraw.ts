@@ -7,7 +7,7 @@ import { readFileSync } from "fs";
 // Load wallet
 const walletData = JSON.parse(readFileSync("/home/publius/.stacks-wallet.json", "utf-8"));
 
-const VAULT_URL = "https://sbtc-yield-vault.p-d07.workers.dev";
+const VAULT_URL = "https://vault.pbtc21.dev";
 
 async function testWithdraw() {
   console.log("=== Testing sBTC Vault Withdraw Flow ===\n");

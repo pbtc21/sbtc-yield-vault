@@ -356,5 +356,5 @@
 )
 
 (define-read-only (get-token-uri)
-  (ok (some u"https://sbtc-yield-vault.p-d07.workers.dev/token-metadata.json"))
+  (ok (some u"https://vault.pbtc21.dev/token-metadata.json"))
 )

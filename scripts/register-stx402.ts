@@ -14,13 +14,13 @@ const REGISTRY_URL = "https://stx402.com/api/registry/register";
 
 const VAULT_ENDPOINTS = [
   {
-    url: "https://sbtc-yield-vault.p-d07.workers.dev/deposit",
+    url: "https://vault.pbtc21.dev/deposit",
     name: "sBTC Yield Vault - Deposit",
     description: "Deposit sBTC into leveraged yield vault using looping strategy on Zest Protocol. Returns ~11% APY through 3x leverage.",
     category: "defi",
   },
   {
-    url: "https://sbtc-yield-vault.p-d07.workers.dev/withdraw",
+    url: "https://vault.pbtc21.dev/withdraw",
     name: "sBTC Yield Vault - Withdraw",
     description: "Withdraw sBTC plus accumulated yield from the vault. Burns vault shares and returns proportional assets.",
     category: "defi",

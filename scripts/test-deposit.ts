@@ -9,7 +9,7 @@ import type { X402PaymentRequired } from "x402-stacks";
 // Load wallet
 const walletData = JSON.parse(readFileSync("/home/publius/.stacks-wallet.json", "utf-8"));
 
-const VAULT_URL = "https://sbtc-yield-vault.p-d07.workers.dev";
+const VAULT_URL = "https://vault.pbtc21.dev";
 
 // Create x402 payment client
 const paymentClient = new X402PaymentClient({
