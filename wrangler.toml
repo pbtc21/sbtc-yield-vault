@@ -1,9 +1,11 @@
 name = "sbtc-yield-vault"
-main = "src/index.ts"
+main = "src/index-v3.ts"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
 
 [vars]
-VAULT_CONTRACT = "SP2QXPFF4M72QYZWXE7S5321XJDJ2DD32DGEMN5QA.sbtc-loop-vault"
+VAULT_CONTRACT = "SP2QXPFF4M72QYZWXE7S5321XJDJ2DD32DGEMN5QA.sbtc-yield-vault-v3"
 OPERATOR_ADDRESS = "SP2QXPFF4M72QYZWXE7S5321XJDJ2DD32DGEMN5QA"
 NETWORK = "mainnet"
+KEEPER_TOKENS = ""
