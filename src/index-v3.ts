@@ -5,6 +5,7 @@ import type { Env, Variables } from "./types";
 import { getZestPoolData, getZestRates, ZEST_CONTRACTS, calculateMaxBorrow, type ZestPoolData } from "./zest";
 import { getBestSwapRoute, getSwapQuote } from "./bitflow";
 import { getBtcPrice } from "./executor";
+import { VAULT_HTML } from "./frontend";
 
 /**
  * sBTC Yield Vault v3 API
@@ -162,7 +163,12 @@ async function getHealthStatus(): Promise<HealthStatus> {
 // PUBLIC ENDPOINTS
 // ============================================
 
+// Frontend - serve HTML for browsers
 app.get("/", (c) => {
+  const accept = c.req.header("Accept") || "";
+  if (accept.includes("text/html")) {
+    return c.html(VAULT_HTML);
+  }
   return c.json({
     service: "sBTC Yield Vault v3",
     version: "3.0.0",
@@ -176,7 +182,7 @@ app.get("/", (c) => {
     ],
     endpoints: {
       // Public
-      "GET /": "API info",
+      "GET /": "API info (or frontend if Accept: text/html)",
       "GET /stats": "Vault statistics",
       "GET /health": "Health factor status",
       "GET /position/:address": "User position",
