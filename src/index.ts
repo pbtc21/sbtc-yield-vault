@@ -286,7 +286,7 @@ app.get("/contracts", (c) => {
     integrations: {
       zest: ZEST_CONTRACTS,
       sbtc: "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token",
-      usdh: "SPN5AKG35QZSK2M8GAMR4AFX45659RJHDW353HSG.usdh-token-v1",
+      usdh: "SPKH9AWG0ENZ87J1X0PBD4HETP22G8W22AFNVF8K.usdh-token-v1",
     },
     strategy: {
       type: "Leveraged sBTC Yield via Operator",
@@ -386,7 +386,7 @@ app.get("/operator/loop-instructions", async (c) => {
         contract: "SP2VCQJGH7PHP2DJK7Z0V48AGBHQAW3R3ZW1QF4N.borrow-helper-v2-1-5",
         function: "borrow",
         params: {
-          asset: "SPN5AKG35QZSK2M8GAMR4AFX45659RJHDW353HSG.usdh-token-v1",
+          asset: "SPKH9AWG0ENZ87J1X0PBD4HETP22G8W22AFNVF8K.usdh-token-v1",
           targetLtv: "70%",
         },
       },
