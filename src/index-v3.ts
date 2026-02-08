@@ -25,6 +25,8 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 // CONFIGURATION
 // ============================================
 
+const PAYMENT_ADDRESS = "SPKH9AWG0ENZ87J1X0PBD4HETP22G8W22AFNVF8K";
+
 const VAULT_CONFIG = {
   contract: "SP2QXPFF4M72QYZWXE7S5321XJDJ2DD32DGEMN5QA.sbtc-yield-vault-v3",
   maxTvl: 100_000_000n, // 1 BTC in sats
@@ -432,6 +434,263 @@ app.post("/simulate", async (c) => {
       maxDrawdown: `${((1 - VAULT_CONFIG.maxLtvBps / VAULT_CONFIG.liquidationThresholdBps) * 100).toFixed(1)}%`,
       healthFactorBuffer: (calculateHealthFactor(totalDeposited, totalBorrowed, btcPrice) - KEEPER_CONFIG.emergencyThreshold).toFixed(2),
     },
+  });
+});
+
+// ============================================
+// x402 DISCOVERY ENDPOINTS
+// ============================================
+
+// Aggregate x402 discovery endpoint
+app.get("/.well-known/x402", (c) => {
+  return c.json({
+    x402Version: 1,
+    name: "sBTC Yield Vault",
+    description: "Secure leveraged yield vault using sBTC + BSD (USDh) on Zest Protocol",
+    accepts: [
+      {
+        scheme: "exact",
+        network: "stacks",
+        maxAmountRequired: "1000",
+        resource: "/deposit",
+        description: "Deposit sBTC into the yield vault",
+        mimeType: "application/json",
+        payTo: PAYMENT_ADDRESS,
+        maxTimeoutSeconds: 300,
+        asset: "STX"
+      },
+      {
+        scheme: "exact",
+        network: "stacks",
+        maxAmountRequired: "1000",
+        resource: "/request-withdrawal",
+        description: "Request withdrawal with 24-hour cooldown",
+        mimeType: "application/json",
+        payTo: PAYMENT_ADDRESS,
+        maxTimeoutSeconds: 300,
+        asset: "STX"
+      },
+      {
+        scheme: "exact",
+        network: "stacks",
+        maxAmountRequired: "1000",
+        resource: "/complete-withdrawal",
+        description: "Complete pending withdrawal after cooldown",
+        mimeType: "application/json",
+        payTo: PAYMENT_ADDRESS,
+        maxTimeoutSeconds: 300,
+        asset: "STX"
+      },
+      {
+        scheme: "exact",
+        network: "stacks",
+        maxAmountRequired: "500",
+        resource: "/simulate",
+        description: "Simulate deposit outcome and projected yields",
+        mimeType: "application/json",
+        payTo: PAYMENT_ADDRESS,
+        maxTimeoutSeconds: 300,
+        asset: "STX"
+      },
+      {
+        scheme: "exact",
+        network: "stacks",
+        maxAmountRequired: "0",
+        resource: "/emergency-withdraw",
+        description: "Emergency withdrawal when health is critical (free)",
+        mimeType: "application/json",
+        payTo: PAYMENT_ADDRESS,
+        maxTimeoutSeconds: 300,
+        asset: "STX"
+      }
+    ]
+  });
+});
+
+// x402 discovery for deposit
+app.get("/deposit", (c) => {
+  return c.json({
+    x402Version: 1,
+    name: "sBTC Yield Vault - Deposit",
+    accepts: [{
+      scheme: "exact",
+      network: "stacks",
+      maxAmountRequired: "1000",
+      resource: "/deposit",
+      description: "Deposit sBTC into the yield vault to earn leveraged returns via Zest Protocol looping strategy",
+      mimeType: "application/json",
+      payTo: PAYMENT_ADDRESS,
+      maxTimeoutSeconds: 300,
+      asset: "STX",
+      outputSchema: {
+        input: {
+          type: "object",
+          properties: {
+            amount: { type: "string", description: "Amount in sats to deposit" },
+            sender: { type: "string", description: "Stacks address of depositor" },
+            maxLossBps: { type: "number", description: "Max loss tolerance in basis points (optional, default 500)" }
+          },
+          required: ["amount", "sender"]
+        },
+        output: {
+          type: "object",
+          properties: {
+            message: { type: "string" },
+            transaction: { type: "object", description: "Unsigned transaction to sign and broadcast" },
+            deposit: { type: "object", description: "Deposit details including expected shares" }
+          }
+        }
+      }
+    }]
+  });
+});
+
+// x402 discovery for request-withdrawal
+app.get("/request-withdrawal", (c) => {
+  return c.json({
+    x402Version: 1,
+    name: "sBTC Yield Vault - Request Withdrawal",
+    accepts: [{
+      scheme: "exact",
+      network: "stacks",
+      maxAmountRequired: "1000",
+      resource: "/request-withdrawal",
+      description: "Request withdrawal of vault shares with 24-hour cooldown period",
+      mimeType: "application/json",
+      payTo: PAYMENT_ADDRESS,
+      maxTimeoutSeconds: 300,
+      asset: "STX",
+      outputSchema: {
+        input: {
+          type: "object",
+          properties: {
+            shares: { type: "string", description: "Number of vault shares to withdraw" },
+            sender: { type: "string", description: "Stacks address of withdrawer" },
+            minReceive: { type: "string", description: "Minimum sBTC to receive (slippage protection)" }
+          },
+          required: ["shares", "sender"]
+        },
+        output: {
+          type: "object",
+          properties: {
+            message: { type: "string" },
+            transaction: { type: "object", description: "Unsigned transaction to sign and broadcast" },
+            withdrawal: { type: "object", description: "Withdrawal details including cooldown info" }
+          }
+        }
+      }
+    }]
+  });
+});
+
+// x402 discovery for complete-withdrawal
+app.get("/complete-withdrawal", (c) => {
+  return c.json({
+    x402Version: 1,
+    name: "sBTC Yield Vault - Complete Withdrawal",
+    accepts: [{
+      scheme: "exact",
+      network: "stacks",
+      maxAmountRequired: "1000",
+      resource: "/complete-withdrawal",
+      description: "Complete a pending withdrawal after cooldown period has passed",
+      mimeType: "application/json",
+      payTo: PAYMENT_ADDRESS,
+      maxTimeoutSeconds: 300,
+      asset: "STX",
+      outputSchema: {
+        input: {
+          type: "object",
+          properties: {
+            sender: { type: "string", description: "Stacks address of withdrawer" }
+          },
+          required: ["sender"]
+        },
+        output: {
+          type: "object",
+          properties: {
+            message: { type: "string" },
+            transaction: { type: "object", description: "Unsigned transaction to sign and broadcast" }
+          }
+        }
+      }
+    }]
+  });
+});
+
+// x402 discovery for simulate
+app.get("/simulate", (c) => {
+  return c.json({
+    x402Version: 1,
+    name: "sBTC Yield Vault - Simulate Deposit",
+    accepts: [{
+      scheme: "exact",
+      network: "stacks",
+      maxAmountRequired: "500",
+      resource: "/simulate",
+      description: "Simulate deposit outcome including projected yield, leverage, and risk metrics",
+      mimeType: "application/json",
+      payTo: PAYMENT_ADDRESS,
+      maxTimeoutSeconds: 300,
+      asset: "STX",
+      outputSchema: {
+        input: {
+          type: "object",
+          properties: {
+            amount: { type: "string", description: "Amount in sats to simulate" },
+            loops: { type: "number", description: "Number of leverage loops (optional, default 3)" }
+          },
+          required: ["amount"]
+        },
+        output: {
+          type: "object",
+          properties: {
+            input: { type: "object", description: "Input parameters" },
+            rates: { type: "object", description: "Current Zest Protocol rates" },
+            simulation: { type: "object", description: "Loop-by-loop simulation results" },
+            projectedYield: { type: "object", description: "APY projections after fees" },
+            risks: { type: "object", description: "Risk metrics and liquidation thresholds" }
+          }
+        }
+      }
+    }]
+  });
+});
+
+// x402 discovery for emergency-withdraw
+app.get("/emergency-withdraw", (c) => {
+  return c.json({
+    x402Version: 1,
+    name: "sBTC Yield Vault - Emergency Withdrawal",
+    accepts: [{
+      scheme: "exact",
+      network: "stacks",
+      maxAmountRequired: "0",
+      resource: "/emergency-withdraw",
+      description: "Emergency withdrawal when vault health is critical (no payment required)",
+      mimeType: "application/json",
+      payTo: PAYMENT_ADDRESS,
+      maxTimeoutSeconds: 300,
+      asset: "STX",
+      outputSchema: {
+        input: {
+          type: "object",
+          properties: {
+            sender: { type: "string", description: "Stacks address of withdrawer" }
+          },
+          required: ["sender"]
+        },
+        output: {
+          type: "object",
+          properties: {
+            message: { type: "string" },
+            warning: { type: "string" },
+            transaction: { type: "object", description: "Unsigned transaction to sign and broadcast" },
+            healthStatus: { type: "object", description: "Current vault health status" }
+          }
+        }
+      }
+    }]
   });
 });
 
